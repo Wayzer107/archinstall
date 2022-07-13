@@ -31,32 +31,22 @@ class Subvolume:
 
 	@classmethod
 	def _parse(cls, config_subvolumes: List[Dict[str, Any]]) -> List['Subvolume']:
-		subvolumes = []
-		for entry in config_subvolumes:
-			if not entry.get('name', None) or not entry.get('mountpoint', None):
-				continue
-
-			subvolumes.append(
-				Subvolume(
-					entry['name'],
-					entry['mountpoint'],
-					entry.get('compress', False),
-					entry.get('nodatacow', False)
-				)
-			)
-
-		return subvolumes
+		return [
+		    Subvolume(
+		        entry['name'],
+		        entry['mountpoint'],
+		        entry.get('compress', False),
+		        entry.get('nodatacow', False),
+		    ) for entry in config_subvolumes
+		    if entry.get('name', None) and entry.get('mountpoint', None)
+		]
 
 	@classmethod
 	def _parse_backwards_compatible(cls, config_subvolumes) -> List['Subvolume']:
-		subvolumes = []
-		for name, mountpoint in config_subvolumes.items():
-			if not name or not mountpoint:
-				continue
-
-			subvolumes.append(Subvolume(name, mountpoint))
-
-		return subvolumes
+		return [
+		    Subvolume(name, mountpoint)
+		    for name, mountpoint in config_subvolumes.items() if name and mountpoint
+		]
 
 	@classmethod
 	def parse_arguments(cls, config_subvolumes: Any) -> List['Subvolume']:

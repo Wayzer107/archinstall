@@ -93,18 +93,17 @@ class Translation:
 				raise TranslationError(f"Could not locate language file for '{names}': {error}")
 
 	def activate(self, name):
-		if language := self._languages.get(name, None):
-			languages = LanguageDefinitions()
-
-			if languages.is_cyrillic(name):
-				self._set_font('UniCyr_8x16')
-			else:
-				# this will reset a possible previously set font to a default font
-				self._set_font('')
-
-			language.install()
-		else:
+		if not (language := self._languages.get(name, None)):
 			raise ValueError(f'Language not supported: {name}')
+		languages = LanguageDefinitions()
+
+		if languages.is_cyrillic(name):
+			self._set_font('UniCyr_8x16')
+		else:
+			# this will reset a possible previously set font to a default font
+			self._set_font('')
+
+		language.install()
 
 	def _set_font(self, font: str):
 		from archinstall import SysCommand, log
@@ -122,8 +121,7 @@ class Translation:
 	@classmethod
 	def get_locales_dir(cls) -> Path:
 		cur_path = Path(__file__).parent.parent
-		locales_dir = Path.joinpath(cur_path, 'locales')
-		return locales_dir
+		return Path.joinpath(cur_path, 'locales')
 
 	@classmethod
 	def _defined_languages(cls) -> List[str]:

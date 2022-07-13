@@ -56,10 +56,12 @@ def setup_subvolumes(installation: 'Installer', partition_dict: Dict[str, Any]):
 		# in this way only zstd compression is activaded
 		# TODO WARNING it is not clear if it should be a standard feature, so it might need to be deactivated
 
-		if subvolume.compress:
-			if not any(['compress' in filesystem_option for filesystem_option in partition_dict.get('filesystem', {}).get('mount_options', [])]):
-				if (cmd := SysCommand(f"chattr +c {installation.target}/{name}")).exit_code != 0:
-					raise DiskError(f"Could not set compress attribute at {installation.target}/{name}: {cmd}")
+		if subvolume.compress and all(
+		    'compress' not in filesystem_option
+		    for filesystem_option in partition_dict.get('filesystem', {}).get(
+		        'mount_options', [])):
+			if (cmd := SysCommand(f"chattr +c {installation.target}/{name}")).exit_code != 0:
+				raise DiskError(f"Could not set compress attribute at {installation.target}/{name}: {cmd}")
 
 
 def subvolume_info_from_path(path: Path) -> Optional[BtrfsSubvolumeInfo]:

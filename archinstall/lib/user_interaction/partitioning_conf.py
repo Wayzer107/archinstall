@@ -23,7 +23,7 @@ def partition_overlap(partitions: list, start: str, end: str) -> bool:
 def current_partition_layout(partitions: List[Dict[str, Any]], with_idx: bool = False, with_title: bool = True) -> str:
 
 	def do_padding(name: str, max_len: int):
-		spaces = abs(len(str(name)) - max_len) + 2
+		spaces = abs(len(name) - max_len) + 2
 		pad_left = int(spaces / 2)
 		pad_right = spaces - pad_left
 		return f'{pad_right * " "}{name}{pad_left * " "}|'
@@ -54,7 +54,7 @@ def current_partition_layout(partitions: List[Dict[str, Any]], with_idx: bool = 
 	# of the table cells
 	for p in display_data:
 		for attribute, value in p.items():
-			if attribute in column_names.keys():
+			if attribute in column_names:
 				column_names[attribute] = max([column_names[attribute], len(str(value)), len(attribute)])
 			else:
 				column_names[attribute] = max([len(str(value)), len(attribute)])
@@ -79,7 +79,7 @@ def current_partition_layout(partitions: List[Dict[str, Any]], with_idx: bool = 
 
 	# we'll create a separate table for the btrfs subvolumes
 	btrfs_subvolumes = [partition['btrfs']['subvolumes'] for partition in partitions if partition.get('btrfs', None)]
-	if len(btrfs_subvolumes) > 0:
+	if btrfs_subvolumes:
 		for subvolumes in btrfs_subvolumes:
 			output = FormattedOutput.as_table(subvolumes)
 			current_layout += f'\n{output}'
@@ -95,15 +95,10 @@ def _get_partitions(partitions :List[Partition], filter_ :Callable = None) -> Li
 	"""
 	filter allows to filter out the indexes once they are set. Should return True if element is to be included
 	"""
-	partition_indexes = []
-	for i in range(len(partitions)):
-		if filter_:
-			if filter_(partitions[i]):
-				partition_indexes.append(str(i))
-		else:
-			partition_indexes.append(str(i))
-
-	return partition_indexes
+	return [
+	    str(i) for i in range(len(partitions))
+	    if filter_ and filter_(partitions[i]) or not filter_
+	]
 
 
 def select_partition(
@@ -184,8 +179,8 @@ def manage_new_and_existing_partitions(block_device: 'BlockDevice') -> Dict[str,
 			]
 
 			indexes = _get_partitions(
-				block_device_struct["partitions"],
-				filter_=lambda x: True if x.get('filesystem', {}).get('format') == 'btrfs' else False
+			    block_device_struct["partitions"],
+			    filter_=lambda x: x.get('filesystem', {}).get('format') == 'btrfs',
 			)
 
 			if len(indexes) > 0:
@@ -241,8 +236,10 @@ def manage_new_and_existing_partitions(block_device: 'BlockDevice') -> Dict[str,
 
 			if valid_parted_position(start) and valid_parted_position(end):
 				if partition_overlap(block_device_struct["partitions"], start, end):
-					log(f"This partition overlaps with other partitions on the drive! Ignoring this partition creation.",
-						fg="red")
+					log(
+					    "This partition overlaps with other partitions on the drive! Ignoring this partition creation.",
+					    fg="red",
+					)
 					continue
 
 				block_device_struct["partitions"].append({
@@ -269,15 +266,15 @@ def manage_new_and_existing_partitions(block_device: 'BlockDevice') -> Dict[str,
 				if choice.value == Menu.no():
 					continue
 
-			block_device_struct.update(suggest_single_disk_layout(block_device)[block_device.path])
+			block_device_struct |= suggest_single_disk_layout(block_device)[
+			    block_device.path]
 		else:
 			current_layout = current_partition_layout(block_device_struct['partitions'], with_idx=True)
 
 			if task == delete_partition:
 				title = _('{}\n\nSelect by index which partitions to delete').format(current_layout)
-				to_delete = select_partition(title, block_device_struct["partitions"], multiple=True)
-
-				if to_delete:
+				if to_delete := select_partition(
+				    title, block_device_struct["partitions"], multiple=True):
 					block_device_struct['partitions'] = [
 						p for idx, p in enumerate(block_device_struct['partitions']) if idx not in to_delete
 					]
@@ -307,7 +304,10 @@ def manage_new_and_existing_partitions(block_device: 'BlockDevice') -> Dict[str,
 					if len(mountpoint):
 						block_device_struct["partitions"][partition]['mountpoint'] = mountpoint
 						if mountpoint == '/boot':
-							log(f"Marked partition as bootable because mountpoint was set to /boot.", fg="yellow")
+							log(
+							    "Marked partition as bootable because mountpoint was set to /boot.",
+							    fg="yellow",
+							)
 							block_device_struct["partitions"][partition]['boot'] = True
 					else:
 						del (block_device_struct["partitions"][partition]['mountpoint'])
@@ -368,7 +368,11 @@ def manage_new_and_existing_partitions(block_device: 'BlockDevice') -> Dict[str,
 
 				# TODO get preexisting partitions
 				title = _('{}\n\nSelect which partition to set subvolumes on').format(current_layout)
-				partition = select_partition(title, block_device_struct["partitions"],filter_=lambda x:True if x.get('filesystem',{}).get('format') == 'btrfs' else False)
+				partition = select_partition(
+				    title,
+				    block_device_struct["partitions"],
+				    filter_=lambda x: x.get('filesystem', {}).get('format') == 'btrfs',
+				)
 
 				if partition is not None:
 					if not block_device_struct["partitions"][partition].get('btrfs', {}):

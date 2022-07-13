@@ -29,7 +29,7 @@ class FormattedOutput:
 		output = ''
 		for key, width in column_width.items():
 			key = key.replace('!', '')
-			output += key.ljust(width) + ' | '
+			output += f'{key.ljust(width)} | '
 
 		output = output[:-3] + '\n'
 		output += '-' * len(output) + '\n'
@@ -38,7 +38,7 @@ class FormattedOutput:
 			for k, v in cls.values(o).items():
 				if '!' in k:
 					v = '*' * len(str(v))
-				output += str(v).ljust(column_width[k]) + ' | '
+				output += f'{str(v).ljust(column_width[k])} | '
 			output = output[:-3]
 			output += '\n'
 
@@ -112,19 +112,16 @@ def stylize_output(text: str, *opts :str, **kwargs) -> str:
 	reset = '0'
 
 	code_list = []
-	if text == '' and len(opts) == 1 and opts[0] == 'reset':
+	if not text and len(opts) == 1 and opts[0] == 'reset':
 		return '\x1b[%sm' % reset
 
 	for k, v in kwargs.items():
-		if k == 'fg':
-			code_list.append(foreground[str(v)])
-		elif k == 'bg':
+		if k == 'bg':
 			code_list.append(background[str(v)])
 
-	for o in opts:
-		if o in opt_dict:
-			code_list.append(opt_dict[o])
-
+		elif k == 'fg':
+			code_list.append(foreground[str(v)])
+	code_list.extend(opt_dict[o] for o in opts if o in opt_dict)
 	if 'noreset' not in opts:
 		text = '%s\x1b[%sm' % (text or '', reset)
 

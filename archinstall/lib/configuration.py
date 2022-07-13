@@ -10,14 +10,12 @@ from .exceptions import RequirementError
 from .hsm import get_fido2_devices
 
 def configuration_sanity_check():
-	if storage['arguments'].get('HSM'):
-		if not get_fido2_devices():
-			raise RequirementError(
-				f"In order to use HSM to pair with the disk encryption,"
-				+ f" one needs to be accessible through /dev/hidraw* and support"
-				+ f" the FIDO2 protocol. You can check this by running"
-				+ f" 'systemd-cryptenroll --fido2-device=list'."
-			)
+	if storage['arguments'].get('HSM') and not get_fido2_devices():
+		raise RequirementError(
+		    ((("In order to use HSM to pair with the disk encryption," +
+		       " one needs to be accessible through /dev/hidraw* and support") +
+		      " the FIDO2 protocol. You can check this by running") +
+		     " 'systemd-cryptenroll --fido2-device=list'."))
 
 class ConfigurationOutput:
 	def __init__(self, config: Dict):
@@ -60,9 +58,7 @@ class ConfigurationOutput:
 				self._user_credentials[key] = self._config[key]
 			elif key == 'disk_layouts':
 				self._disk_layout = self._config[key]
-			elif key in self._ignore:
-				pass
-			else:
+			elif key not in self._ignore:
 				self._user_config[key] = self._config[key]
 
 	def user_config_to_json(self) -> str:
@@ -98,8 +94,8 @@ class ConfigurationOutput:
 	def _is_valid_path(self, dest_path :pathlib.Path) -> bool:
 		if (not dest_path.exists()) or not (dest_path.is_dir()):
 			log(
-				'Destination directory {} does not exist or is not a directory,\n Configuration files can not be saved'.format(dest_path.resolve()),
-				fg="yellow"
+			    f'Destination directory {dest_path.resolve()} does not exist or is not a directory,\n Configuration files can not be saved',
+			    fg="yellow",
 			)
 			return False
 		return True

@@ -18,7 +18,7 @@ def ask_for_main_filesystem_format(advanced_options=False) -> str:
 	advanced = {'ntfs': 'ntfs'}
 
 	if advanced_options:
-		options.update(advanced)
+		options |= advanced
 
 	prompt = _('Select which filesystem your main partition should use')
 	choice = Menu(prompt, options, skip=False).run()
@@ -80,7 +80,6 @@ def select_disk(dict_o_disks: Dict[str, BlockDevice]) -> Optional[BlockDevice]:
 		if choice.type_ == MenuSelectionType.Esc:
 			return None
 
-		drive = dict_o_disks[choice.value]
-		return drive
+		return dict_o_disks[choice.value]
 
 	raise DiskError('select_disk() requires a non-empty dictionary of disks to select from.')

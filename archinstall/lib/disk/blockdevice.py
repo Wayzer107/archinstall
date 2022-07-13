@@ -111,10 +111,10 @@ class BlockDevice:
 		}
 
 	def _call_lsblk(self, path: str) -> Dict[str, Any]:
-		output = SysCommand(f'lsblk --json -b -o+SIZE,PTTYPE,ROTA,TRAN,PTUUID {self._path}').decode('UTF-8')
-		if output:
-			lsblk_info = json.loads(output)
-			return lsblk_info
+		if output := SysCommand(
+		    f'lsblk --json -b -o+SIZE,PTTYPE,ROTA,TRAN,PTUUID {self._path}').decode(
+		        'UTF-8'):
+			return json.loads(output)
 
 		raise DiskError(f'Failed to read disk "{self.path}" with lsblk')
 
@@ -137,8 +137,8 @@ class BlockDevice:
 		# so the free will ignore the ESP partition and just give the "free" space.
 		# Doesn't harm us, but worth noting in case something weird happens.
 		try:
-			output = SysCommand(f"parted -s --machine {self._path} print free").decode('utf-8')
-			if output:
+			if output := SysCommand(
+			    f"parted -s --machine {self._path} print free").decode('utf-8'):
 				free_lines = [line for line in output.split('\n') if 'free' in line]
 				sizes = []
 				for free_space in free_lines:
@@ -275,7 +275,9 @@ class BlockDevice:
 
 	def get_partition(self, uuid :Optional[str] = None, partuuid :Optional[str] = None) -> Partition:
 		if not uuid and not partuuid:
-			raise ValueError(f"BlockDevice.get_partition() requires either a UUID or a PARTUUID for lookups.")
+			raise ValueError(
+			    "BlockDevice.get_partition() requires either a UUID or a PARTUUID for lookups."
+			)
 
 		for count in range(storage.get('DISK_RETRY_ATTEMPTS', 5)):
 			for partition_index, partition in self.partitions.items():
@@ -288,8 +290,6 @@ class BlockDevice:
 					# Most likely a blockdevice that doesn't support or use UUID's
 					# (like Microsoft recovery partition)
 					log(f"Could not get UUID/PARTUUID of {partition}: {error}", level=logging.DEBUG, fg="gray")
-					pass
-
 			log(f"uuid {uuid} or {partuuid} not found. Waiting {storage.get('DISK_TIMEOUTS', 1) * count}s for next attempt",level=logging.DEBUG)
 			time.sleep(storage.get('DISK_TIMEOUTS', 1) * count)
 

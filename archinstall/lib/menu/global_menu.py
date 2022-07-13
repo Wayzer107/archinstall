@@ -130,19 +130,19 @@ class GlobalMenu(GeneralMenu):
 				default={},
 				display_func=lambda x: f'{len(x)} {_("User(s)")}' if len(x) > 0 else None,
 				preview_func=self._prev_users)
-		self._menu_options['profile'] = \
-			Selector(
-				_('Profile'),
-				lambda preset: self._select_profile(preset),
-				display_func=lambda x: x if x else 'None'
-			)
-		self._menu_options['audio'] = \
-			Selector(
-				_('Audio'),
-				lambda preset: ask_for_audio_selection(is_desktop_profile(storage['arguments'].get('profile', None)),preset),
-				display_func=lambda x: x if x else 'None',
-				default=None
-			)
+		self._menu_options['profile'] = Selector(
+		    _('Profile'),
+		    lambda preset: self._select_profile(preset),
+		    display_func=lambda x: x or 'None',
+		)
+		self._menu_options['audio'] = Selector(
+		    _('Audio'),
+		    lambda preset: ask_for_audio_selection(
+		        is_desktop_profile(storage['arguments'].get('profile', None)), preset
+		    ),
+		    display_func=lambda x: x or 'None',
+		    default=None,
+		)
 		self._menu_options['kernels'] = \
 			Selector(
 				_('Kernels'),
@@ -183,12 +183,12 @@ class GlobalMenu(GeneralMenu):
 				_('Save configuration'),
 				lambda preset: save_config(self._data_store),
 				no_store=True)
-		self._menu_options['install'] = \
-			Selector(
-				self._install_text(),
-				exec_func=lambda n,v: True if len(self._missing_configs()) == 0 else False,
-				preview_func=self._prev_install_missing_config,
-				no_store=True)
+		self._menu_options['install'] = Selector(
+		    self._install_text(),
+		    exec_func=lambda n, v: len(self._missing_configs()) == 0,
+		    preview_func=self._prev_install_missing_config,
+		    no_store=True,
+		)
 
 		self._menu_options['abort'] = Selector(_('Abort'), exec_func=lambda n,v:exit(1))
 
@@ -200,26 +200,29 @@ class GlobalMenu(GeneralMenu):
 		self._update_install_text(name, result)
 
 	def exit_callback(self):
-		if self._data_store.get('harddrives', None) and self._data_store.get('!encryption-password', None):
+		if not self._data_store.get('harddrives', None) or not self._data_store.get(
+		    '!encryption-password', None):
+			return
 			# If no partitions was marked as encrypted, but a password was supplied and we have some disks to format..
 			# Then we need to identify which partitions to encrypt. This will default to / (root).
-			if len(list(encrypted_partitions(storage['arguments'].get('disk_layouts', [])))) == 0:
-				for blockdevice in storage['arguments']['disk_layouts']:
-					if storage['arguments']['disk_layouts'][blockdevice].get('partitions'):
-						for partition_index in select_encrypted_partitions(
-								title=_('Select which partitions to encrypt:'),
-								partitions=storage['arguments']['disk_layouts'][blockdevice]['partitions'],
-								filter_=(lambda p: p['mountpoint'] != '/boot')
-							):
+		if not list(
+		    encrypted_partitions(storage['arguments'].get('disk_layouts', []))):
+			for blockdevice in storage['arguments']['disk_layouts']:
+				if storage['arguments']['disk_layouts'][blockdevice].get('partitions'):
+					for partition_index in select_encrypted_partitions(
+							title=_('Select which partitions to encrypt:'),
+							partitions=storage['arguments']['disk_layouts'][blockdevice]['partitions'],
+							filter_=(lambda p: p['mountpoint'] != '/boot')
+						):
 
-							partition = storage['arguments']['disk_layouts'][blockdevice]['partitions'][partition_index]
-							partition['encrypted'] = True
-							partition['!password'] = storage['arguments']['!encryption-password']
+						partition = storage['arguments']['disk_layouts'][blockdevice]['partitions'][partition_index]
+						partition['encrypted'] = True
+						partition['!password'] = storage['arguments']['!encryption-password']
 
-							# We make sure generate-encryption-key-file is set on additional partitions
-							# other than the root partition. Otherwise they won't unlock properly #1279
-							if partition['mountpoint'] != '/':
-								partition['generate-encryption-key-file'] = True
+						# We make sure generate-encryption-key-file is set on additional partitions
+						# other than the root partition. Otherwise they won't unlock properly #1279
+						if partition['mountpoint'] != '/':
+							partition['generate-encryption-key-file'] = True
 
 	def _install_text(self):
 		missing = len(self._missing_configs())
@@ -230,11 +233,10 @@ class GlobalMenu(GeneralMenu):
 	def _display_network_conf(self, cur_value: Union[NetworkConfiguration, List[NetworkConfiguration]]) -> str:
 		if not cur_value:
 			return _('Not configured, unavailable unless setup manually')
+		if isinstance(cur_value, list):
+			return str(_('Configured {} interfaces')).format(len(cur_value))
 		else:
-			if isinstance(cur_value, list):
-				return str(_('Configured {} interfaces')).format(len(cur_value))
-			else:
-				return str(cur_value)
+			return str(cur_value)
 
 	def _prev_network_config(self) -> Optional[str]:
 		selector = self._menu_options['nic']
@@ -269,7 +271,7 @@ class GlobalMenu(GeneralMenu):
 	def _display_disk_layout(self, current_value: Optional[Dict[str, Any]]) -> str:
 		if current_value:
 			total_partitions = [entry['partitions'] for entry in current_value.values()]
-			total_nr = sum([len(p) for p in total_partitions])
+			total_nr = sum(len(p) for p in total_partitions)
 			return f'{total_nr} {_("Partitions")}'
 		return ''
 
@@ -294,7 +296,7 @@ class GlobalMenu(GeneralMenu):
 
 		def has_superuser() -> bool:
 			users = self._menu_options['!users'].current_selection
-			return any([u.sudo for u in users])
+			return any(u.sudo for u in users)
 
 		missing = []
 		if not check('bootloader'):
@@ -305,16 +307,15 @@ class GlobalMenu(GeneralMenu):
 			missing += [str(_('Either root-password or at least 1 user with sudo privileges must be specified'))]
 		if not check('harddrives'):
 			missing += [str(_('Drive(s)'))]
-		if check('harddrives'):
-			if not self._menu_options['harddrives'].is_empty() and not check('disk_layouts'):
-				missing += [str(_('Disk layout'))]
+		if (check('harddrives') and not self._menu_options['harddrives'].is_empty()
+		    and not check('disk_layouts')):
+			missing += [str(_('Disk layout'))]
 
 		return missing
 
 	def _set_root_password(self) -> Optional[str]:
 		prompt = str(_('Enter root password (leave blank to disable root): '))
-		password = get_password(prompt=prompt)
-		return password
+		return get_password(prompt=prompt)
 
 	def _select_encrypted_password(self) -> Optional[str]:
 		if passwd := get_password(prompt=str(_('Enter disk encryption password (leave blank for no encryption): '))):
@@ -401,5 +402,4 @@ class GlobalMenu(GeneralMenu):
 		return ret
 
 	def _create_user_account(self, defined_users: List[User]) -> List[User]:
-		users = ask_for_additional_users(defined_users=defined_users)
-		return users
+		return ask_for_additional_users(defined_users=defined_users)

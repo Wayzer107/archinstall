@@ -22,20 +22,21 @@ if TYPE_CHECKING:
 
 
 def ask_ntp(preset: bool = True) -> bool:
-	prompt = str(_('Would you like to use automatic time synchronization (NTP) with the default time servers?\n'))
-	prompt += str(_('Hardware time and other post-configuration steps might be required in order for NTP to work.\nFor more information, please check the Arch wiki'))
-	if preset:
-		preset_val = Menu.yes()
-	else:
-		preset_val = Menu.no()
+	prompt = str(
+	    _('Would you like to use automatic time synchronization (NTP) with the default time servers?\n'
+	      )
+	) + str(
+	    _('Hardware time and other post-configuration steps might be required in order for NTP to work.\nFor more information, please check the Arch wiki'
+	      ))
+	preset_val = Menu.yes() if preset else Menu.no()
 	choice = Menu(prompt, Menu.yes_no(), skip=False, preset_values=preset_val, default_option=Menu.yes()).run()
 
-	return False if choice.value == Menu.no() else True
+	return choice.value != Menu.no()
 
 
 def ask_hostname(preset: str = None) -> str:
-	hostname = TextInput(_('Desired hostname for the installation: '), preset).run().strip(' ')
-	return hostname
+	return (TextInput(_('Desired hostname for the installation: '),
+	                  preset).run().strip(' '))
 
 
 def ask_for_a_timezone(preset: str = None) -> str:
@@ -85,10 +86,7 @@ def select_language(preset_value: str = None) -> str:
 		sort=False
 	).run()
 
-	if selected_lang.value is None:
-		return preset_value
-
-	return selected_lang.value
+	return preset_value if selected_lang.value is None else selected_lang.value
 
 
 def select_mirror_regions(preset_values: Dict[str, Any] = {}) -> Dict[str, Any]:
@@ -178,7 +176,7 @@ def ask_additional_packages_to_install(pre_set_packages: List[str] = []) -> List
 		input_packages = TextInput(_('Write additional packages to install (space separated, leave blank to skip): '), display).run().strip()
 		return input_packages.split() if input_packages else []
 
-	pre_set_packages = pre_set_packages if pre_set_packages else []
+	pre_set_packages = pre_set_packages or []
 	packages = read_packages(pre_set_packages)
 
 	if not storage['arguments']['offline'] and not storage['arguments']['no_pkg_lookups']:

@@ -55,22 +55,20 @@ class UserList(ListManager):
 				data += [new_user]
 		elif action == self._actions[1]:  # change password
 			prompt = str(_('Password for user "{}": ').format(entry.username))
-			new_password = get_password(prompt=prompt)
-			if new_password:
+			if new_password := get_password(prompt=prompt):
 				user = next(filter(lambda x: x == entry, data), 1)
 				user.password = new_password
 		elif action == self._actions[2]:  # promote/demote
 			user = next(filter(lambda x: x == entry, data), 1)
-			user.sudo = False if user.sudo else True
+			user.sudo = not user.sudo
 		elif action == self._actions[3]:  # delete
 			data = [d for d in data if d != entry]
 
 		return data
 
 	def _check_for_correct_username(self, username: str) -> bool:
-		if re.match(r'^[a-z_][a-z0-9_-]*\$?$', username) and len(username) <= 32:
-			return True
-		return False
+		return bool(
+		    re.match(r'^[a-z_][a-z0-9_-]*\$?$', username) and len(username) <= 32)
 
 	def _add_user(self) -> Optional[User]:
 		prompt = '\n\n' + str(_('Enter username (leave blank to skip): '))
@@ -94,10 +92,9 @@ class UserList(ListManager):
 			show_search_hint=False
 		).run()
 
-		sudo = True if choice.value == Menu.yes() else False
+		sudo = choice.value == Menu.yes()
 		return User(username, password, sudo)
 
 
 def ask_for_additional_users(prompt: str = '', defined_users: List[User] = []) -> List[User]:
-	users = UserList(prompt, defined_users).run()
-	return users
+	return UserList(prompt, defined_users).run()
