@@ -33,7 +33,9 @@ class Partition:
 
 		self.block_device = block_device
 		if type(self.block_device) is str:
-			raise ValueError(f"Partition()'s 'block_device' parameter has to be a archinstall.BlockDevice() instance!")
+			raise ValueError(
+			    "Partition()'s 'block_device' parameter has to be a archinstall.BlockDevice() instance!"
+			)
 
 		self.path = path
 		self.part_id = part_id
@@ -82,20 +84,18 @@ class Partition:
 		"""
 		this is used for the table representation of the partition (see FormattedOutput)
 		"""
-		partition_info = {
-			'type': 'primary',
-			'PARTUUID': self._safe_uuid,
-			'wipe': self.allow_formatting,
-			'boot': self.boot,
-			'ESP': self.boot,
-			'mountpoint': self.target_mountpoint,
-			'encrypted': self._encrypted,
-			'start': self.start,
-			'size': self.end,
-			'filesystem': self.filesystem_type
+		return {
+		    'type': 'primary',
+		    'PARTUUID': self._safe_uuid,
+		    'wipe': self.allow_formatting,
+		    'boot': self.boot,
+		    'ESP': self.boot,
+		    'mountpoint': self.target_mountpoint,
+		    'encrypted': self._encrypted,
+		    'start': self.start,
+		    'size': self.end,
+		    'filesystem': self.filesystem_type,
 		}
-
-		return partition_info
 
 	def __dump__(self) -> Dict[str, Any]:
 		# TODO remove this in favour of as_json
@@ -131,8 +131,6 @@ class Partition:
 		except SysCallError as error:
 			# Not mounted anywhere most likely
 			log(f"Could not locate mount information for {self.path}: {error}", level=logging.DEBUG, fg="grey")
-			pass
-
 		return None
 
 	@property
@@ -189,12 +187,13 @@ class Partition:
 	def boot(self) -> bool:
 		output = json.loads(SysCommand(f"sfdisk --json {self.block_device.path}").decode('UTF-8'))
 
-		for partition in output.get('partitiontable', {}).get('partitions', []):
-			if partition['node'] == self.path:
-				# first condition is for MBR disks, second for GPT disks
-				return partition.get('bootable', False) or partition.get('type','') == 'C12A7328-F81F-11D2-BA4B-00A0C93EC93B'
-
-		return False
+		return next(
+		    (partition.get('bootable', False)
+		     or partition.get('type', '') == 'C12A7328-F81F-11D2-BA4B-00A0C93EC93B'
+		     for partition in output.get('partitiontable', {}).get('partitions', [])
+		     if partition['node'] == self.path),
+		    False,
+		)
 
 	@property
 	def partition_type(self) -> Optional[str]:
@@ -217,8 +216,7 @@ class Partition:
 
 			time.sleep(max(0.1, storage['DISK_TIMEOUTS'] * i))
 
-			partuuid = self._safe_part_uuid
-			if partuuid:
+			if partuuid := self._safe_part_uuid:
 				return partuuid
 
 		raise DiskError(f"Could not get PARTUUID for {self.path} using 'blkid -s PARTUUID -o value {self.path}'")
@@ -237,8 +235,7 @@ class Partition:
 
 			time.sleep(storage.get('DISK_TIMEOUTS', 1) * i)
 
-			partuuid = self._safe_uuid
-			if partuuid:
+			if partuuid := self._safe_uuid:
 				return partuuid
 
 		raise DiskError(f"Could not get PARTUUID for {self.path} using 'blkid -s PARTUUID -o value {self.path}'")
@@ -334,8 +331,7 @@ class Partition:
 							yield subvolume
 
 					if child.get('children'):
-						for subchild in iterate_children_recursively(child):
-							yield subchild
+						yield from iterate_children_recursively(child)
 
 		for mountpoint in self.mount_information:
 			if result := findmnt(pathlib.Path(mountpoint['target'])):
@@ -344,13 +340,12 @@ class Partition:
 						if subvolume := subvolume_info_from_path(pathlib.Path(mountpoint['target'])):
 							yield subvolume
 
-					for child in iterate_children_recursively(filesystem):
-						yield child
+					yield from iterate_children_recursively(filesystem)
 
 	def partprobe(self) -> bool:
 		try:
 			if self.block_device:
-				return 0 == SysCommand(f'partprobe {self.block_device.device}').exit_code
+				return SysCommand(f'partprobe {self.block_device.device}').exit_code == 0
 		except SysCallError as error:
 			log(f"Unreliable results might be given for {self.path} due to partprobe error: {error}", level=logging.DEBUG)
 
@@ -385,7 +380,7 @@ class Partition:
 
 		temporary_path.rmdir()
 
-		return True if files > 0 else False
+		return files > 0
 
 	def encrypt(self, *args :str, **kwargs :str) -> str:
 		"""
@@ -478,17 +473,14 @@ class Partition:
 				raise UnknownFilesystemFormat(f"Fileformat '{filesystem}' is not yet implemented.")
 		except SysCallError as error:
 			log(f"Formatting ran in to an error: {error}", level=logging.WARNING, fg="orange")
-			if retry is True:
+			if retry:
 				log(f"Retrying in {storage.get('DISK_TIMEOUTS', 1)} seconds.", level=logging.WARNING, fg="orange")
 				time.sleep(storage.get('DISK_TIMEOUTS', 1))
 
 				return self.format(filesystem, path, log_formatting, options, retry=False)
 
-		if get_filesystem_type(path) == 'crypto_LUKS' or get_filesystem_type(self.real_device) == 'crypto_LUKS':
-			self.encrypted = True
-		else:
-			self.encrypted = False
-
+		self.encrypted = (get_filesystem_type(path) == 'crypto_LUKS'
+		                  or get_filesystem_type(self.real_device) == 'crypto_LUKS')
 		return True
 
 	def find_parent_of(self, data :Dict[str, Any], name :str, parent :Optional[str] = None) -> Optional[str]:
@@ -500,42 +492,41 @@ class Partition:
 					return parent
 
 	def mount(self, target :str, fs :Optional[str] = None, options :str = '') -> bool:
-		if not self.mountpoint:
-			log(f'Mounting {self} to {target}', level=logging.INFO)
+		if self.mountpoint:
+			return False
+		log(f'Mounting {self} to {target}', level=logging.INFO)
 
-			if not fs:
-				if not self.filesystem:
-					raise DiskError(f'Need to format (or define) the filesystem on {self} before mounting.')
-				fs = self.filesystem
+		if not fs:
+			if not self.filesystem:
+				raise DiskError(f'Need to format (or define) the filesystem on {self} before mounting.')
+			fs = self.filesystem
 
-			fs_type = get_mount_fs_type(fs)
+		fs_type = get_mount_fs_type(fs)
 
-			pathlib.Path(target).mkdir(parents=True, exist_ok=True)
+		pathlib.Path(target).mkdir(parents=True, exist_ok=True)
 
-			if self.bind_name:
-				device_path = self.device_path
-				# TODO options should be better be a list than a string
-				if options:
-					options = f"{options},subvol={self.bind_name}"
-				else:
-					options = f"subvol={self.bind_name}"
+		if self.bind_name:
+			device_path = self.device_path
+			# TODO options should be better be a list than a string
+			if options:
+				options = f"{options},subvol={self.bind_name}"
 			else:
-				device_path = self.path
-			try:
-				if options:
-					mnt_handle = SysCommand(f"/usr/bin/mount -t {fs_type} -o {options} {device_path} {target}")
-				else:
-					mnt_handle = SysCommand(f"/usr/bin/mount -t {fs_type} {device_path} {target}")
+				options = f"subvol={self.bind_name}"
+		else:
+			device_path = self.path
+		try:
+			if options:
+				mnt_handle = SysCommand(f"/usr/bin/mount -t {fs_type} -o {options} {device_path} {target}")
+			else:
+				mnt_handle = SysCommand(f"/usr/bin/mount -t {fs_type} {device_path} {target}")
 
-				# TODO: Should be redundant to check for exit_code
-				if mnt_handle.exit_code != 0:
-					raise DiskError(f"Could not mount {self.path} to {target} using options {options}")
-			except SysCallError as err:
-				raise err
+			# TODO: Should be redundant to check for exit_code
+			if mnt_handle.exit_code != 0:
+				raise DiskError(f"Could not mount {self.path} to {target} using options {options}")
+		except SysCallError as err:
+			raise err
 
-			return True
-
-		return False
+		return True
 
 	def unmount(self) -> bool:
 		worker = SysCommand(f"/usr/bin/umount {self.path}")

@@ -44,11 +44,9 @@ class BTRFSPartition(Partition):
 					if '[' in child.get('source', ''):
 						yield subvolume_info_from_path(child['target'])
 
-					for sub_child in iterate_children(child):
-						yield sub_child
+					yield from iterate_children(child)
 
-			for child in iterate_children(filesystem):
-				yield child
+			yield from iterate_children(filesystem)
 
 	def create_subvolume(self, subvolume :pathlib.Path, installation :Optional['Installer'] = None) -> 'BtrfsSubvolumeInfo':
 		"""
@@ -66,11 +64,8 @@ class BTRFSPartition(Partition):
 		# We do this by checking if the path contains a known mountpoint.
 		if str(subvolume)[0] == '/':
 			if filesystems := findmnt(subvolume, traverse=True).get('filesystems'):
-				if (target := filesystems[0].get('target')) and target != '/' and str(subvolume).startswith(target):
-					# Path starts with a known mountpoint which isn't /
-					# Which means it's an absolute path to a mounted location.
-					pass
-				else:
+				if (not (target := filesystems[0].get('target')) or target == '/'
+				    or not str(subvolume).startswith(target)):
 					# Since it's not an absolute position with a known start.
 					# We omit the anchor ('/' basically) and make sure it's appendable
 					# to the installation.target later

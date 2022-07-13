@@ -136,8 +136,7 @@ class BtrfsSubvolumeInfo:
 								if '[' in child.get('source', ''):
 									yield subvolume_info_from_path(child['target'])
 
-								for sub_child in iterate_children(child):
-									yield sub_child
+								yield from iterate_children(child)
 
 						for child in iterate_children(filesystem[0]):
 							if child.uuid == self.uuid:
@@ -158,8 +157,7 @@ class BtrfsSubvolumeInfo:
 
 	def convert_to_ISO_format(self, time_string):
 		time_string_almost_done = time_string.replace(' ', 'T', 1).replace(' ', '')
-		iso_string = f"{time_string_almost_done[:-2]}:{time_string_almost_done[-2:]}"
-		return iso_string
+		return f"{time_string_almost_done[:-2]}:{time_string_almost_done[-2:]}"
 
 	def mount(self, mountpoint :pathlib.Path, options=None, include_previously_known_options=True):
 		from ..helpers import findmnt
@@ -181,7 +179,7 @@ class BtrfsSubvolumeInfo:
 		except DiskError:
 			pass
 
-		if not any('subvol=' in x for x in options):
+		if all('subvol=' not in x for x in options):
 			options += f'subvol={self.name}'
 
 		SysCommand(f"mount {self.partition.path} {mountpoint} -o {','.join(options)}")

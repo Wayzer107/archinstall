@@ -85,23 +85,18 @@ class NetworkConfigurationHandler:
 
 			installation.enable_service('systemd-networkd')
 			installation.enable_service('systemd-resolved')
-		else:
-			# If user selected to copy the current ISO network configuration
-			# Perform a copy of the config
-			if self._configuration.is_iso():
-				installation.copy_iso_network_config(
-					enable_services=True)  # Sources the ISO network configuration to the install medium.
-			elif self._configuration.is_network_manager():
-				installation.add_additional_packages(["networkmanager"])
-				if (profile := storage['arguments'].get('profile')) and profile.is_desktop_profile:
-					installation.add_additional_packages(["network-manager-applet"])
-				installation.enable_service('NetworkManager.service')
+		elif self._configuration.is_iso():
+			installation.copy_iso_network_config(
+				enable_services=True)  # Sources the ISO network configuration to the install medium.
+		elif self._configuration.is_network_manager():
+			installation.add_additional_packages(["networkmanager"])
+			if (profile := storage['arguments'].get('profile')) and profile.is_desktop_profile:
+				installation.add_additional_packages(["network-manager-applet"])
+			installation.enable_service('NetworkManager.service')
 
 	def _backwards_compability_config(self, config: Union[str,Dict[str, str]]) -> Union[List[NetworkConfiguration], NetworkConfiguration, None]:
 		def get(config: Dict[str, str], key: str) -> List[str]:
-			if (value := config.get(key, None)) is not None:
-				return [value]
-			return []
+			return [value] if (value := config.get(key, None)) is not None else []
 
 		if isinstance(config, str):  # is a ISO network
 			return NetworkConfiguration(NicType.ISO)
@@ -135,7 +130,8 @@ class NetworkConfigurationHandler:
 				log(_('No iface specified for manual configuration'))
 				exit(1)
 
-			if manual_config.get('dhcp', False) or not any([manual_config.get(v, '') for v in ['ip', 'gateway', 'dns']]):
+			if manual_config.get('dhcp', False) or not any(
+			    manual_config.get(v, '') for v in ['ip', 'gateway', 'dns']):
 				configurations.append(
 					NetworkConfiguration(NicType.MANUAL, iface=iface)
 				)
@@ -176,8 +172,7 @@ class NetworkConfigurationHandler:
 				self._configuration = NetworkConfiguration(type_)
 			else:  # manual configuration settings
 				self._configuration = self._parse_manual_config([config])
-		else:  # old style definitions
-			network_config = self._backwards_compability_config(config)
-			if network_config:
-				return network_config
+		elif network_config := self._backwards_compability_config(config):
+			return network_config
+		else:
 			return None

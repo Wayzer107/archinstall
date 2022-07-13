@@ -90,10 +90,7 @@ def meminfo(key: Optional[str] = None) -> Union[dict[str, int], Optional[int]]:
 			for line in file
 		}
 
-	if key is None:
-		return mem_info
-
-	return mem_info.get(key)
+	return mem_info if key is None else mem_info.get(key)
 
 
 def has_wifi() -> bool:
@@ -150,12 +147,12 @@ def cpu_model() -> Optional[str]:
 
 
 def sys_vendor() -> Optional[str]:
-	with open(f"/sys/devices/virtual/dmi/id/sys_vendor") as vendor:
+	with open("/sys/devices/virtual/dmi/id/sys_vendor") as vendor:
 		return vendor.read().strip()
 
 
 def product_name() -> Optional[str]:
-	with open(f"/sys/devices/virtual/dmi/id/product_name") as product:
+	with open("/sys/devices/virtual/dmi/id/product_name") as product:
 		return product.read().strip()
 
 

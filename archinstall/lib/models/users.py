@@ -54,9 +54,7 @@ class User:
 	def _parse_backwards_compatible(cls, config_users: Dict, sudo: bool) -> List['User']:
 		if len(config_users.keys()) > 0:
 			username = list(config_users.keys())[0]
-			password = config_users[username]['!password']
-
-			if password:
+			if password := config_users[username]['!password']:
 				return [User(username, password, sudo)]
 
 		return []
